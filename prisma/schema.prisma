@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  admin
+  super_admin
+}
+
+model Users {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(50)
+  email        String   @unique @db.VarChar(100)
+  password     String   @db.VarChar(100)
+  role         Role     @default(user)
+  phone_number String   @db.VarChar(20)
+  deleted      Boolean  @default(false) // ✅ tambahkan ini
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tickets     tickets[]
+  TicketUsage TicketUsage[]
+  Review      Review[]
+  fishing     Fishing[]
+}
+
+enum Status {
+  available
+  unavailable
+}
+
+model Fishing {
+  id             Int           @id @default(autoincrement())
+  name           String        @db.VarChar(50)
+  description    String        @db.Text()
+  price_per_hour Decimal       @db.Decimal()
+  image          String        @db.VarChar(100)
+  status         Status
+  createdAt      DateTime      @default(now())
+  updateAt       DateTime      @default(now()) @updatedAt
+  userId         Int
+  user           Users         @relation(fields: [userId], references: [id])
+  tickets        tickets[]
+  ticketUsages   TicketUsage[] // tambahkan ini
+  Review         Review[]
+
+  @@map("fishing")
+}
+
+enum StatusTickets {
+  unused
+  used
+  expired
+}
+
+enum StatusPayment {
+  unpaid
+  paid
+  expired
+}
+
+model tickets {
+  id                Int           @id @default(autoincrement())
+  user_id           Int
+  user              Users         @relation(fields: [user_id], references: [id])
+  ticket_code       String        @unique @db.VarChar(10)
+  fishing_spot_id   Int
+  fishing_spot      Fishing       @relation(fields: [fishing_spot_id], references: [id])
+  valid_date        DateTime
+  status            StatusTickets
+  status_pembayaran StatusPayment @default(unpaid)
+  duration_minutes  Int
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+  TicketUsage       TicketUsage[]
+  Payment           Payment? // one to one
+
+  @@map("tickets")
+}
+
+model Payment {
+  id           Int           @id @default(autoincrement())
+  ticket_id    Int           @unique // 1 payment untuk 1 tiket (bisa ubah kalau 1 tiket bisa punya beberapa payment)
+  ticket       tickets       @relation(fields: [ticket_id], references: [id])
+  amount       Float
+  payment_date DateTime      @default(now())
+  status       StatusPayment
+  created_at   DateTime      @default(now())
+
+  @@map("payments")
+}
+
+model TicketUsage {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  ticketId      Int
+  usedAt        DateTime
+  durationUsed  Int
+  fishingSpotId Int
+
+  // Relasi
+  user        Users   @relation(fields: [userId], references: [id])
+  ticket      tickets @relation(fields: [ticketId], references: [id])
+  fishingSpot Fishing @relation(fields: [fishingSpotId], references: [id])
+
+  @@map("ticket_usages")
+}
+
+model Review {
+  id              Int      @id @default(autoincrement())
+  user_id         Int
+  fishing_spot_id Int
+  rating          Int
+  comment         String
+  created_at      DateTime @default(now())
+
+  user        Users   @relation(fields: [user_id], references: [id])
+  fishingSpot Fishing @relation(fields: [fishing_spot_id], references: [id])
+
+  @@map("review")
+}
